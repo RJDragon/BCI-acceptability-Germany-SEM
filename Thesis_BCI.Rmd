@@ -1,0 +1,1039 @@
+---
+title: "Thesis_BCI"
+author: "Robert Dragon"
+date: "2025-11-03"
+output: 
+  html_document:
+    theme: cerulean
+    toc: true
+    toc_float: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+path <- 'C:/Users/Robert/OneDrive/NCP Oldenburg/Master-Thesis/Statistik/Thesis_Code'
+datapath_AG1 <- 'C:/Users/Robert/OneDrive/NCP Oldenburg/Master-Thesis/Statistik/Thesis_Code/AG1_results.csv'
+datapath_AG2 <- 'C:/Users/Robert/OneDrive/NCP Oldenburg/Master-Thesis/Statistik/Thesis_Code/AG2_results.csv'
+setwd(path)
+
+# libraries
+
+# data wrangling
+library(tidyverse)
+# reading french data in excel
+library(readxl)
+
+# CFA
+library(lavaan)
+
+# für omega
+library(semTools)
+# extra tool for SEM - here for an overview of indirect effects inside the SEM
+library(semhelpinghands)
+
+# for summary, extracting digits from strings
+library(stringr)
+
+#descriptive
+library(knitr)
+# make table pretty
+library(kableExtra)
+# for the factor descriptives
+library(gt)
+library(purrr)
+# for plots for checking for outliers
+library(ggforce)
+
+# for the comparison GER-FRE BIs
+library(BayesFactor)
+```
+## Overview of Analytical Workflow
+This R Markdown document implements the complete statistical analysis workflow for the study. The script first loads and harmonises raw survey data across age groups using a shared preprocessing function, including variable selection, renaming, and reverse coding. Datasets are merged and restricted to participants who completed the full questionnaire. For additional exclusion-related checks review datasets are generated.
+Descriptive analyses are conducted in two parts: demographic characteristics with a focus on age distribution, followed by descriptive statistics for all non-demographic study variables. Two confirmatory factor analyses are then estimated to evaluate the proposed measurement models for the outcome constructs behavioural intention (BI), perceived usefulness (PU), and perceived ease of use (PEOU) and for the set of postulated predictor constructs. A structural equation model is subsequently estimated to test the theorised relationships between predictors and behavioural intention, using factor scores for the constructs assumed to act as predictors. Indirect effects are examined in a separate step using bootstrapping to obtain confidence intervals. Finally, behavioural intention in the German sample is compared with the published French sample using a Welch t-test, and pre–post comparisons of perceived usefulness and behavioural intention are conducted using paired-sample t-tests.
+
+##### copy paste new code chunk
+```{r}
+```
+## Data Loading and Preprocessing
+#### Load data
+```{r}
+# loading data
+data_AG1 <- read.csv(datapath_AG1)
+data_AG2 <- read.csv(datapath_AG2)
+#data_AG3 <- read.csv(datapath_AG3)
+#data_AG4 <- read.csv(datapath_AG4)
+
+data_test <- read.csv(datapath_AG1)
+
+french_data_raw <- read_excel("french_results.xlsx")
+
+```
+#### --
+#### Prepare all data with one function and merge-in the data sets
+```{r}
+clean_data <- function(df) {
+  df_clean <- df %>% select(
+  id,
+  startdate,
+  datestamp,
+  prolific_id = G01Q18,
+  prolific_id2 = G01Q05,
+  #relationship with technologies
+  tec1smartphone = tec1.SQ001.,
+  tec1smartwatch = tec1.SQ002.,
+  tec1voiceassistants = tec1.SQ003.,
+  tec1augmentedreality = tec1.SQ004.,
+  tec1virtualreality = tec1.SQ005.,
+  tec1autonomicdrive = tec1.SQ006.,
+  tec1nonregularly = tec1.SQ007.,
+  tec1never = tec1.SQ008.,
+  # BCI knowledge
+  bek1,
+  bek2 = G02Q19.bek2.,
+  bek3 = G02Q19.bek3.,
+  # General Anxiety / Allgemeine Ängstlichkeit
+  all1 = G03Q04.all1.,
+  all2 = G03Q04.all2.,
+  all3 = G03Q04.all3.,
+  all4 = G03Q04.all4.,
+  all5 = G03Q04.all5.,
+  # attention test 1
+  attention7 = G03Q04.SQ009.,
+  # Video 1
+  has_seen_video1 = G01Q24,
+  # Autonomy
+  aut1 = G05Q07.aut1.,
+  aut2 = G05Q07.aut2.,
+  aut3 = G05Q07.aut3.,
+  aut4 = G05Q07.aut4.,
+  # Subjective Norms
+  sub1 = G05Q07.sub1.,
+  sub2 = G05Q07.sub2.,
+  sub3 = G05Q07.sub3.,
+  # Image / Ansehen
+  ans1 = G05Q07.ans1.,
+  ans2 = G05Q07.ans2.,
+  ans3 = G05Q07.ans3.,
+  # Computer Anxiety / Ängstlichkeit
+  aen1 = G05Q07.aen1.,
+  aen2 = G05Q07.aen2.,
+  aen3 = G05Q07.aen3.,
+  # Visual Aesthetics / Optische Ästhetik
+  opt1 = G05Q07.opt1.,
+  opt2 = G05Q07.opt2.,
+  opt3 = G05Q07.opt3.,
+  # Agency / Handlungsfähigkeit
+  han1 = G05Q07.han1.,
+  han2 = G05Q07.han2.,
+  han3 = G05Q07.han3.,
+  han4 = G05Q07.han4.,
+  # Computer Playfulness / Verspieltheit
+  ver1 = G05Q07.ver1.,
+  ver2 = G05Q07.ver2.,
+  ver3 = G05Q07.ver3.,
+  # attention test 2
+  attention5 = G05Q07.SQ039.,
+  # Ease of Learning / Erlernbarkeit
+  erl1 = G05Q07.erl1.,
+  erl2 = G05Q07.erl2.,
+  erl3 = G05Q07.erl3.,
+  erl4 = G05Q07.erl4.,
+  # PU1 / Perceived Usefulness 1 (before video2) / Empfundener Nutzen 1
+  pu11 = G05Q07.pu11.,
+  pu12 = G05Q07.pu12.,
+  pu13 = G05Q07.pu13.,
+  # PEOU / Perceived Ease of Use / Empfundene Benutzerfreundlichkeit
+  peo1 = G05Q07.peo1.,
+  peo2 = G05Q07.peo2.,
+  peo3 = G05Q07.peo3.,
+  # BI1 / Behavioural Intention 1 (before video2) / Handlungsabsichten 1
+  bi11 = G05Q07.bi11.,
+  bi12 = G05Q07.bi12.,
+  bi13 = G05Q07.bi13.,
+  bi14 = G05Q07.bi14.,
+  # Video 2
+  has_seen_video2 = G05Q25,
+  # Result Demonstrability / Nachvollziehbarkeit der Ergebnisse
+  nac1 = G07Q09.nac1.,
+  nac2 = G07Q09.nac2.,
+  nac3 = G07Q09.nac3.,
+  nac4 = G07Q09.nac4.,
+  # Benefits/Risks Ratio / Verhältnis Risiko/Nutzen
+  ris1 = G07Q09.ris1.,
+  ris2 = G07Q09.ris2.,
+  ris3 = G07Q09.ris3.,
+  ris4 = G07Q09.ris4.,
+  # attention test 3
+  attention1 = G07Q09.SQ013.,
+  # Relevance / wissenschaftliche Relevanz
+  rel1 = G07Q09.rel1.,
+  rel2 = G07Q09.rel2.,
+  rel3 = G07Q09.rel3.,
+  rel4 = G07Q09.rel4.,
+  # Self-Efficacy / Selbstwirksamkeit
+  sel1,
+  # Social Support
+  soz1 = G07Q11.soz1.,
+  soz2 = G07Q11.soz2.,
+  soz3 = G07Q11.soz3.,
+  soz4,
+  # PU2 / Perceived Usefulness 2 / Empfundener Nutzen 2
+  pu21 = G07Q13.pu21.,
+  pu22 = G07Q13.pu22.,
+  pu23 = G07Q13.pu23.,
+  # BI2 / Behavioural Intention 2 / Verhaltensabsichten 2
+  bi21 = G07Q13.bi21.,
+  bi22 = G07Q13.bi22.,
+  bi23 = G07Q13.bi23.,
+  bi24 = G07Q13.bi24.,
+  # Gender / Geschlecht
+  ges1,
+  # Age / Alter
+  alt1,
+  # Education / Bildung
+  bil1,
+  # Occupation / Beruf
+  ber1,
+  # Stroke / Schlaganfall
+  sch1 = G08Q20.sch1.,
+  sch2 = G08Q20.sch2.,
+  sch3 = G08Q21.sch3.,
+  sch4,
+  # stats about how long did they take IIII This looks like it needs to be coded for every age group
+  interviewtime,
+  time_taken_group_ID = 104,
+  time_taken_group_PartInfo = 106,
+  time_taken_group_Consent = 108,
+  time_taken_group_extraInfo = 111,
+  time_taken_group_TechnologyUsage = 113,
+  time_taken_group_BCIKnowledge = 115,
+  time_taken_group_Factors1 = 118,
+  time_taken_group_Video1 = 120,
+  time_taken_group_Factors2 = 122,
+  time_taken_group_Video2 = 124,
+  time_taken_group_Factors3 = 126,
+  time_taken_group_SocioDemo = 132
+) %>%
+  mutate(
+    # Reverse-Coding für items die negativ formuliert sind und einen positiv formulierten Faktor messen (oder umgekehrt)
+    aut2 = 10 - aut2,
+    aut4 = 10 - aut4,
+    all3 = 10 - all3,
+    all4 = 10 - all4,
+    opt3 = 10 - opt3,
+    erl2 = 10 - erl2,
+    erl4 = 10 - erl4,
+    nac1 = 10 - nac1,
+    nac4 = 10 - nac4,
+    ris1 = 10 - ris1,
+    
+  )
+  
+  df_clean
+}  
+
+#now applying this function to all four data sets
+AG1_clean <- clean_data(data_AG1)
+AG2_clean <- clean_data(data_AG2)
+#AG3_clean <- clean_data(data_AG3)
+#AG4_clean <- clean_data(data_AG4)
+
+# stacking them together, adding a new column for easier distinguishing age groups later on
+data_test_clean_withNA <- bind_rows(
+  AG1_clean %>% mutate(AG = "AG1"),
+  AG2_clean %>% mutate(AG = "AG2"),
+#  AG3_clean %>% mutate(AG = "AG3"),
+#  AG4_clean %>% mutate(AG = "AG4")
+)
+# keep participants with completed questionnaire
+data_test_clean <- data_test_clean_withNA %>%
+  filter(!is.na(bi24))
+# kick non-completed
+data_kicked_out <- data_test_clean_withNA %>%
+  filter(is.na(bi24))
+
+# overview of final data sets for each age group; maybe for review purposes
+data_AG1_final <- data_test_clean %>%
+  filter(AG == "AG1")
+data_AG2_final <- data_test_clean %>%
+  filter(AG == "AG2")
+#data_AG3_final <- data_test_clean %>%
+#  filter(AG == "AG3")
+#data_AG4_final <- data_test_clean %>%
+#  filter(AG == "AG4")
+
+####### Preparing French data #######
+# French data preparation: getting rid of unnecessary rows, to just have the numbers for BI
+french_data <- french_data_raw[-c(1:2), ]
+french_BI_items <- c(
+  "Q17/4/2_4",
+  "Q17/1/2_4",
+  "Q17/2/2_4",
+  "Q17/2/3_4"
+)
+french_BI_data <- french_data %>%
+  select(all_of(french_BI_items))
+
+french_BI_data <- french_BI_data %>%
+  mutate(across(everything(), ~ as.numeric(gsub(",", ".", .x))))
+
+# sanity check
+# summary(french_BI_data)
+
+
+```
+#### --
+
+## Code für reviewing purposes - creating histograms for all participants and excel friendly files
+#### mean and sd of interviewtime
+```{r}
+mean_time <- mean(data_test_clean$interviewtime, na.rm = TRUE)
+sd_time   <- sd(data_test_clean$interviewtime, na.rm = TRUE)
+cutoff_fast <- mean_time - 3 * sd_time
+mean_time
+sd_time
+cutoff_fast
+
+write.csv(data_test_clean, "Datentabelle_AG1.csv", row.names = FALSE)
+ is_integer(data_test_clean$alt1)
+```
+#### --
+
+#### Reviewing purposes#1: creating pdf with histograms for all Participants
+```{r}
+# quant_vars <- unlist(quant_factors, recursive = TRUE, use.names = FALSE)
+# 
+# # Create ONE PDF with all participants
+# pdf("response_pattern_AG2.pdf", width = 14, height = 6)
+# 
+# for (i in seq_len(nrow(data_AG2_final))) {
+#   
+#   participant_id <- data_AG2_final$id[i]
+#   
+#   # Extract participant responses
+#   values <- data_AG2_final[i, quant_vars] %>%
+#     unlist(use.names = TRUE) %>%
+#     as.numeric()
+#   
+#   item_names <- names(values)
+#   
+#   # Barplot: X = items, Y = response values
+#   barplot(
+#     values,
+#     names.arg = item_names,
+#     las = 2,
+#     col = "steelblue",
+#     border = "grey30",
+#     ylim = c(0, 10),
+#     main = paste("Participant ID:", participant_id),
+#     ylab = "Response Value"
+#   )
+# }
+# 
+# dev.off()
+
+write.csv(data_AG1_final,
+          file = file.path(path, "data_AG1_final.csv"),
+          row.names = FALSE)
+
+write.csv(data_AG2_final,
+          file = file.path(path, "data_AG2_final.csv"),
+          row.names = FALSE)
+
+write.csv(data_kicked_out,
+          file = file.path(path, "data_kicked_out.csv"),
+          row.names = FALSE)
+```
+#### Reviewing purposes#2: creating excel friendly dfs
+```{r}
+# storing existing comma-separated file
+df_AG1 <- read.csv("data_AG1_final.csv")
+
+# write an Excel-friendly version
+write.csv2(
+  df_AG1,
+  "data_AG1_final_excel.csv",
+  row.names = FALSE
+)
+
+# # write an Excel-friendly version
+# write.csv2(
+#   df_AG1,
+#   "data_AG1_final_excel.csv",
+#   row.names = FALSE
+# )
+
+# # storing existing comma-separated file
+# df_AG2 <- read.csv("data_AG2_final.csv")
+# 
+# # write an Excel-friendly version
+# write.csv2(
+#   df_AG2,
+#   "data_AG2_final_excel.csv",
+#   row.names = FALSE
+# )
+# 
+# # storing existing comma-separated file
+# df_kick <- read.csv("data_kicked_out.csv")
+# 
+# # write an Excel-friendly version
+# write.csv2(
+#   df_kick,
+#   "data_kick_excel.csv",
+#   row.names = FALSE
+# )
+```
+#### --
+#### looking for extrem outliers (old)
+```{r}
+# item_cols <- quant_factors %>%
+#   unlist(use.names = FALSE)
+# df_long <- data_test_clean %>%
+#   select(id, all_of(item_cols)) %>%
+#   pivot_longer(
+#     cols = all_of(item_cols),
+#     names_to = "item",
+#     values_to = "response"
+#   )
+# ggplot(df_long, aes(x = item, y = response)) +
+#   geom_col(fill = "grey70") +
+#   facet_wrap_paginate(~ id, ncol = 1, nrow = 1, page = 1) +
+#   scale_y_continuous(limits = c(0, 10)) +
+#   theme_minimal() +
+#   theme(
+#     axis.text.x = element_blank(),
+#     axis.ticks.x = element_blank()
+#   )
+# 
+# n_pages <- length(unique(df_long$id))
+# 
+# for (p in 1:n_pages) {
+#   g <- ggplot(df_long, aes(x = item, y = response)) +
+#     geom_col(fill = "grey70") +
+#     facet_wrap_paginate(~ id, ncol = 1, nrow = 1, page = p) +
+#     scale_y_continuous(limits = c(0, 10)) +
+#     theme_minimal() +
+#     theme(
+#       axis.text.x = element_blank(),
+#       axis.ticks.x = element_blank()
+#     )
+# 
+#   ggsave(
+#     filename = paste0("participant_", p, ".pdf"),
+#     plot = g,
+#     width = 10,
+#     height = 4
+#   )
+# }
+
+# item_cols <- quant_factors %>%
+#   unlist(use.names = FALSE)
+# 
+# n_10 <- data_test_clean %>%
+#   filter(id == 89) %>%
+#   select(all_of(item_cols)) %>%
+#   summarise(across(everything(), ~ sum(. == 10, na.rm = TRUE))) %>%
+#   rowSums()
+# 
+# n_10
+```
+#### --
+
+## Descriptives
+#### Demographics
+```{r}
+# age, gender, education, values per person(/group), stroke
+# Convert education (bil1) to numeric (extract years)
+data_test_clean <- data_test_clean %>%
+  mutate(bil1_num = as.numeric(str_extract(bil1, "\\d+")))
+
+# ---- Numeric summaries ----
+age_stats <- data_test_clean %>%
+  summarise(
+    Mean = mean(alt1, na.rm = TRUE),
+    SD = sd(alt1, na.rm = TRUE),
+    Median = median(alt1, na.rm = TRUE),
+    Min = min(alt1, na.rm = TRUE),
+    Max = max(alt1, na.rm = TRUE)
+  )
+
+edu_stats <- data_test_clean %>%
+  summarise(
+    Mean = mean(bil1_num, na.rm = TRUE),
+    SD = sd(bil1_num, na.rm = TRUE),
+    Median = median(bil1_num, na.rm = TRUE),
+    Min = min(bil1_num, na.rm = TRUE),
+    Max = max(bil1_num, na.rm = TRUE)
+  )
+
+# ---- Categorical summaries ----
+gender_stats <- data_test_clean %>%
+  count(ges1) %>%
+  mutate(Percent = round(100 * n / sum(n), 1))
+
+stroke_stats <- data_test_clean %>%
+  count(sch1) %>%
+  mutate(Percent = round(100 * n / sum(n), 1))
+
+# ---- Build table blocks ----
+age_table <- tibble(
+  Variable = "Age (years)",
+  `Category / Statistic` = c("Mean (SD)", "Median [Min–Max]"),
+  Value = c(
+    sprintf("%.2f (%.2f)", age_stats$Mean, age_stats$SD),
+    sprintf(
+      "%d [%d–%d]",
+      as.integer(age_stats$Median),
+      as.integer(age_stats$Min),
+      as.integer(age_stats$Max)
+    )
+  )
+)
+
+edu_table <- tibble(
+  Variable = "Education (years)",
+  `Category / Statistic` = c("Mean (SD)", "Median [Min–Max]"),
+  Value = c(
+    sprintf("%.2f (%.2f)", edu_stats$Mean, edu_stats$SD),
+    sprintf(
+      "%d [%d–%d]",
+      as.integer(edu_stats$Median),
+      as.integer(edu_stats$Min),
+      as.integer(edu_stats$Max)
+    )
+  )
+)
+
+gender_table <- gender_stats %>%
+  mutate(
+    Variable = "Gender",
+    `Category / Statistic` = ges1,
+    Value = sprintf("%d (%.1f%%)", n, Percent)
+  ) %>%
+  select(Variable, `Category / Statistic`, Value)
+
+stroke_table <- stroke_stats %>%
+  mutate(
+    Variable = "Stroke history",
+    `Category / Statistic` = sch1,
+    Value = sprintf("%d (%.1f%%)", n, Percent)
+  ) %>%
+  select(Variable, `Category / Statistic`, Value)
+
+# ---- Combine everything ----
+descriptive_table <- bind_rows(
+  age_table,
+  edu_table,
+  gender_table,
+  stroke_table
+)
+
+# ---- Print publication-ready table ----
+kable(
+  descriptive_table,
+  caption = "Descriptive characteristics of the sample",
+  align = c("l", "l", "r")
+) %>%
+  kable_styling(
+    bootstrap_options = "striped",
+    full_width = FALSE
+  )
+```
+
+#### Age table just for comparison with representative goals
+```{r}
+# ---- Step 1: Define age groups in your data ----
+data_test_clean <- data_test_clean %>%
+  mutate(
+    age_group = case_when(
+      alt1 >= 18 & alt1 <= 29 ~ "18–29 years",
+      alt1 >= 30 & alt1 <= 49 ~ "30–49 years",
+      alt1 >= 50 & alt1 <= 64 ~ "50–64 years",
+      alt1 >= 65              ~ "65+ years",
+      TRUE ~ NA_character_
+    )
+  )
+
+# ---- Step 2: Objective values (Destatis 2022, target N = 588) ----
+objective_table <- tibble(
+  age_group = c("18–29 years", "30–49 years", "50–64 years", "65+ years"),
+  Objective_Percent = c(15.51, 30.27, 27.54, 26.69),
+  Objective_N = c(91, 178, 162, 157)
+)
+
+# ---- Step 3: Obtained values from your data ----
+obtained_table <- data_test_clean %>%
+  filter(!is.na(age_group)) %>%
+  count(age_group) %>%
+  mutate(
+    Obtained_N = n,
+    Obtained_Percent = round(100 * n / sum(n), 2)
+  ) %>%
+  select(age_group, Obtained_Percent, Obtained_N)
+
+# ---- Step 4: Combine objective and obtained ----
+age_comparison_table <- objective_table %>%
+  left_join(obtained_table, by = "age_group")
+
+# ---- Step 5: Pretty output ----
+kable(
+  age_comparison_table,
+  col.names = c(
+    "Age group",
+    "Objective (%)",
+    "Objective N",
+    "Obtained (%)",
+    "Obtained N"
+  ),
+  caption = "Comparison of planned and obtained age distribution"
+) %>%
+  kable_styling(
+    bootstrap_options = c("striped"),
+    full_width = FALSE,
+    position = "center"
+  )
+```
+
+#### Descriptives for all the non-demografics (all the quantitative and categorical factors)
+```{r}
+# --- 1️⃣ Quantitative factors setup ---
+quant_factors <- list(
+  `Target variables` = list(
+    BI1 = c("bi11","bi12","bi13","bi14"),
+    BI2 = c("bi21","bi22","bi23","bi24"),
+    PU1 = c("pu11","pu12","pu13"),
+    PU2 = c("pu21","pu22","pu23"),
+    PEOU = c("peo1","peo2","peo3")
+  ),
+  `System characteristics` = list(
+    Relevance = c("rel1","rel2","rel3","rel4"),
+    `Benefits/Risks` = c("ris1","ris2","ris3","ris4"),
+    `Result demonstrability` = c("nac1","nac2","nac3","nac4"),
+    `Visual aesthetics` = c("opt1","opt2","opt3"),
+    Image = c("ans1","ans2","ans3")
+  ),
+  `Social influence` = list(
+    `Subjective norm` = c("sub1","sub2","sub3")
+  ),
+  `Individuals differences` = list(
+    Autonomy = c("aut1","aut2","aut3","aut4"),
+    `General anxiety` = c("all1","all2","all3","all4","all5"),
+    `Computer anxiety` = c("aen1","aen2","aen3")
+  ),
+  `Facilitating conditions` = list(
+    Agency = c("han1","han2","han3","han4"),
+    `Computer playfulness` = c("ver1","ver2","ver3"),
+    `Ease of learning` = c("erl1","erl2","erl3","erl4"),
+    `Social support` = c("soz1","soz2","soz3")
+  )
+)
+
+# Compute factor scores
+for(cat in names(quant_factors)){
+  for(fac in names(quant_factors[[cat]])){
+    items <- quant_factors[[cat]][[fac]]
+    score_name <- paste0(fac, "_score")
+    data_test_clean[[score_name]] <- rowMeans(data_test_clean[items], na.rm = TRUE)
+  }
+}
+
+# Build quantitative table with category subtitles, no asterisks
+quant_table <- map_dfr(names(quant_factors), function(cat){
+  tibble(
+    Factor = c(cat, names(quant_factors[[cat]])),  # category as plain text
+    Mean = c("", sapply(names(quant_factors[[cat]]), function(fac){
+      round(mean(data_test_clean[[paste0(fac, "_score")]], na.rm = TRUE), 2)
+    })),
+    SD = c("", sapply(names(quant_factors[[cat]]), function(fac){
+      round(sd(data_test_clean[[paste0(fac, "_score")]], na.rm = TRUE), 2)
+    }))
+  )
+})
+
+# Print table
+kable(quant_table, caption = "Descriptive statistics for quantitative factors") %>%
+  kable_styling(full_width = FALSE, position = "center", font_size = 12)
+
+# --- Define your categorical factors and their answer options ---
+
+# --- Define categorical factors and answer options (German) ---
+cat_factors <- list(
+  "Use of technologies" = c(
+    "Smartphone",
+    "Smartwatch",
+    "Sprachgesteuerte Assistenten",
+    "Augmented Reality-Tools",
+    "Virtual Reality-Tools",
+    "Autonomes Fahrzeug",
+    "Ich verwende diese Technologien nur gelegentlich",
+    "Ich verwende diese Technologien nie"
+  ),
+  "BCI knowledge" = c(
+    "Ich möchte nicht antworten",
+    "Nein",
+    "Ja, aber ich habe noch nie eine Gehirn-Computer-Schnittstelle genutzt",
+    "Ja, und ich habe bereits einmal eine Gehirn-Computer-Schnittstelle genutzt",
+    "Ja, und ich habe eine Gehirn-Computer-Schnittstelle 2- bis 5-mal genutzt",
+    "Ja, und ich habe eine Gehirn-Computer-Schnittstelle mehr als 5-mal genutzt"
+  ),
+  "Self-efficacy" = c(
+    "Allein und unabhängig.",
+    "Allein, sofern eine Unterstützungsfunktion in das System integriert ist um Hilfe zu bekommen, zum Beispiel in Form eines virtuellen Begleiters.",
+    "Allein, sofern ich eine ähnliche Technologie schon einmal benutzt habe.",
+    "Nur, wenn mir jemand zeigt, wie ich die Übungen durchführen kann und mich nach und nach anleitet."
+  ),
+  "Social support" = c(
+    "Selbstständig, allein zu Hause.",
+    "Allein, aber in einer Gesundheitseinrichtung.",
+    "In Anwesenheit einer medizinischen Fachkraft."
+  )
+)
+
+# --- Mapping dataset columns ---
+mapping <- list(
+  "Use of technologies" = c(
+    "Smartphone" = "tec1smartphone",
+    "Smartwatch" = "tec1smartwatch",
+    "Sprachgesteuerte Assistenten" = "tec1voiceassistants",
+    "Augmented Reality-Tools" = "tec1augmentedreality",
+    "Virtual Reality-Tools" = "tec1virtualreality",
+    "Autonomes Fahrzeug" = "tec1autonomicdrive",
+    "Ich verwende diese Technologien nur gelegentlich" = "tec1nonregularly",
+    "Ich verwende diese Technologien nie" = "tec1never"
+  ),
+  "BCI knowledge" = "bek1",
+  "Self-efficacy" = "sel1",
+  "Social support" = "soz4"
+)
+
+# --- Choice type labels ---
+choice_type <- c(
+  "Use of technologies" = "Multiple choice",
+  "BCI knowledge" = "Single choice",
+  "Self-efficacy" = "Single choice",
+  "Social support" = "Single choice"
+)
+
+# --- Compute percentages ---
+cat_table_list <- list()
+
+for(fac in names(cat_factors)){
+  
+  answers <- cat_factors[[fac]]
+  
+  perc_values <- sapply(answers, function(a){
+    
+    if(fac == "Use of technologies"){
+      # Multiple choice: count "Ja"
+      col_name <- mapping[[fac]][a]
+      perc <- round(
+        100 * sum(data_test_clean[[col_name]] == "Ja", na.rm = TRUE) / nrow(data_test_clean),
+        1
+      )
+      
+    } else {
+      # Single choice
+      col_name <- mapping[[fac]]
+      perc <- round(
+        100 * sum(data_test_clean[[col_name]] == a, na.rm = TRUE) / nrow(data_test_clean),
+        1
+      )
+    }
+    
+    paste0(a, " (", perc, "%)")
+  })
+  
+  # Combine answers into one clean line
+  answers_combined <- paste(perc_values, collapse = "; ")
+  
+  # Store row
+  cat_table_list[[fac]] <- tibble(
+    Factor = paste0(fac, " (", choice_type[fac], ")"),
+    `Answer options` = answers_combined
+  )
+}
+
+# --- Bind rows ---
+cat_summary <- bind_rows(cat_table_list)
+
+# --- Print publication-ready table ---
+kable(
+  cat_summary,
+  caption = "Descriptive statistics for categorical factors"
+) %>%
+  kable_styling(
+    full_width = FALSE,
+    position = "center",
+    font_size = 12
+  ) %>%
+  column_spec(2, width = "16cm")
+```
+
+## Statistical Analysis
+#### CFA 1
+```{r}
+modelA_cfa1 <- '
+# Latente Variablen: Target Factors
+BI =~ bi21 + bi22 + bi23 + bi24
+PU =~ pu21 + pu22 + pu23
+PEOU =~ peo1 + peo2 + peo3
+'
+
+fitA <- cfa(
+  modelA_cfa1,
+  data = data_test_clean,
+  std.lv = TRUE    # fix latent variances to 1 (this enables to use that output for creating the latent scores). Here this is not needed but added for consistency
+  )
+
+# check fit
+summary(fitA, fit.measures = TRUE, standardized = TRUE)
+
+# McDonald’s ω
+compRelSEM(fitA)
+#mcD <- compRelSEM(fitA)
+#mcD
+
+```
+#### CFA 2
+```{r}
+modelB_cfa2 <- '
+# Latente Variablen: Predictor Factors
+Relevance =~ rel1 + rel2 + rel3 + rel4
+Benefits_Risks =~ ris1 + ris2 + ris3 + ris4
+Result_Demonstrability =~ nac1 + nac2 + nac3 + nac4
+Autonomy =~ aut1 + aut2 + aut3 + aut4
+General_Anxiety =~ all1 + all2 + all3 + all4 + all5
+Subjective_Norms =~ sub1 + sub2 + sub3
+Image =~ ans1 + ans2 + ans3
+Computer_Anxiety =~ aen1 + aen2 + aen3
+Visual_Aesthetics =~ opt1 + opt2 + opt3
+Agency =~ han1 + han2 + han3 + han4
+Playfulness =~ ver1 + ver2 + ver3
+Ease_of_Learning =~ erl1 + erl2 + erl3 + erl4
+# note to myself! its just 47 items, one soz-item (soz4) is not being assessed via the slider and is qualitative!
+Social_Support =~ soz1 + soz2 + soz3
+
+'
+
+fitB <- cfa(
+  modelB_cfa2, 
+  data = data_test_clean,
+  std.lv = TRUE     # fix latent variances to 1 (this enables to use that output for creating the latent scores). 
+                    # std.lv = TRUE ensures: Latent variables are on the same standardized scale. Factor scores can be interpreted as z-scores
+                    # lavaan will treat those scores as observed variables in the SEM
+  )
+summary(fitB, fit.measures = TRUE, standardized = TRUE)
+
+# McDonald’s ω
+compRelSEM(fitB)
+```
+
+#### SEM
+```{r}
+# Preparation for the SEM. The predictor factors will be included in the model as their latent scores!
+# Extract factor scores for SEM
+scoresB <- lavPredict(fitB, method = "regression")
+head(scoresB)
+
+# Add latent predictor scores to main dataset
+data_sem <- cbind(data_test_clean, scoresB)
+
+# Check
+head(data_sem)
+
+modelC_sem <- '
+# --- Latent variables ---
+BI  =~ bi21 + bi22 + bi23 + bi24
+PU  =~ pu21 + pu22 + pu23
+PEOU =~ peo1 + peo2 + peo3
+
+# --- Regressions with labels ---
+# Direct effects
+BI ~ b1*PU + b2*PEOU + b3*Subjective_Norms
+PU ~ a1*PEOU + a2*Relevance + a3*Benefits_Risks + a4*Result_Demonstrability +
+      a5*Visual_Aesthetics + a6*Image + a7*Subjective_Norms +
+      a8*General_Anxiety + a9*Computer_Anxiety + a10*Autonomy
+PEOU ~ c1*General_Anxiety + c2*Computer_Anxiety + c3*Autonomy +
+        c4*Agency + c5*Playfulness + c6*Ease_of_Learning + c7*Social_Support
+
+# --- Indirect effects via PU ---
+rel_bi_via_pu   := a2  * b1   # Relevance
+ris_bi_via_pu   := a3  * b1   # Benefits / Risks
+nac_bi_via_pu   := a4  * b1   # Result demonstrability
+opt_bi_via_pu   := a5  * b1   # Visual aesthetics
+ans_bi_via_pu   := a6  * b1   # Image
+sub_bi_via_pu   := a7  * b1   # Subjective norm
+all_bi_via_pu   := a8  * b1   # General anxiety
+aen_bi_via_pu   := a9  * b1   # Computer anxiety
+aut_bi_via_pu   := a10 * b1   # Autonomy
+peou_bi_via_pu  := a1  * b1   # PEOU → PU → BI
+
+# --- Indirect effects via PEOU ---
+all_bi_via_peou := c1 * b2    # General anxiety
+aen_bi_via_peou := c2 * b2    # Computer anxiety
+aut_bi_via_peou := c3 * b2    # Autonomy
+han_bi_via_peou := c4 * b2    # Agency
+ver_bi_via_peou := c5 * b2    # Computer playfulness
+erl_bi_via_peou := c6 * b2    # Ease of learning
+soz_bi_via_peou := c7 * b2    # Social support
+'
+
+fitC <- sem(modelC_sem, data = data_sem)
+summary(fitC, fit.measures = TRUE, standardized = TRUE)
+```
+
+#### SEM with bootstrapping for direct and indirect effects
+```{r}
+# Fit SEM with 5000 bootstrap samples
+fitC_boot <- sem(
+  modelC_sem,
+  data = data_sem,
+  se = "bootstrap",
+  bootstrap = 5000
+)
+
+# # Trigger internal parameter bookkeeping to avoid est1 error
+# parameterEstimates(fitC_boot, standardized = TRUE)
+
+# Standard summary with bootstrap CIs
+summary(
+  fitC_boot,
+  standardized = TRUE,
+  ci = TRUE
+)
+
+
+# using the extra package for SEM: using this function to get standardized solution with bootstrap CIs
+ci_boot <- standardizedSolution_boot_ci(fitC_boot)
+# Print the results
+print(ci_boot, output = "text")
+
+# prob wrong use/failed the knit/unneccessary?
+# # same, but just for BI (what we are interested in)
+# ci_boot_BI <- subset(ci_boot, lhs == "BI")
+# print(ci_boot_BI, output = "text")
+
+
+# Parameter estimates with bootstrap CIs (includes indirect effects)
+# pe_boot <- parameterEstimates(
+#   fitC_boot,
+#   standardized = TRUE,
+#   ci = TRUE,
+#   level = 0.95
+# )
+# 
+# # Extract indirect effects only
+# pe_indirect <- subset(pe_boot, op == ":=")
+# 
+# # Print all indirect effects
+# kable(
+#   pe_indirect,
+#   digits = 3,
+#   caption = "Bootstrapped indirect effects with 95% confidence intervals"
+# ) %>%
+#   kable_styling(full_width = FALSE)
+```
+
+#### Comparing BI-scores between Germany-sample and France-sample
+```{r}
+# Compute German BI mean per participant
+data_test_clean$BI_mean <- rowMeans(
+  data_test_clean[, c("bi21", "bi22", "bi23", "bi24")],
+  na.rm = TRUE
+)
+# Compute French BI mean per participant
+french_BI <- rowMeans(french_BI_data, na.rm = TRUE)
+french_BI <- french_BI[!is.na(french_BI)]
+
+# sum(is.na(data_test_clean$BI_mean))  # German sample
+# sum(is.na(french_BI))                # French sample
+
+# Welch two-sample t-test
+welch_test_result <- t.test(
+  data_test_clean$BI_mean,
+  french_BI,
+  alternative = "two.sided",  # two-sided test
+  var.equal = FALSE           # Welch, allows unequal variances
+)
+
+welch_test_result
+# if p ≥ .05 → no significant difference
+
+# "In addition, we will conduct a Bayesian independent-samples t-test to assess the evidence for or against 
+# a difference between samples. Bayes factors will be used to distinguish between absence of evidence 
+# and evidence for no difference, with BF₀₁ ≥ 3 interpreted as evidence in favour of no difference between 
+# samples. 
+
+# Bayesian t-test
+bf_result <- ttestBF(
+  x = data_test_clean$BI_mean,
+  y = french_BI,
+  paired = FALSE
+)
+
+bf_result
+# Extract numeric BF10
+bf10 <- extractBF(bf_result, onlybf = TRUE)
+bf10
+#> e.g., 0.1506
+
+# Compute BF01 (evidence for H0)
+bf01 <- 1 / bf10
+bf01
+if (bf01 >= 3) {
+  message("BF01 = ", round(bf01, 2), 
+          ": evidence in favor of no difference (supports H0, as BF₀₁ ≥ 3 ).")
+}
+```
+
+#### Comparing BI and PU with pre and post video2 values
+```{r}
+# Compute pre- and post-video means for PU
+data_test_clean$PU_pre_mean  <- rowMeans(data_test_clean[, c("pu11", "pu12", "pu13")], na.rm = TRUE)
+data_test_clean$PU_post_mean <- rowMeans(data_test_clean[, c("pu21", "pu22", "pu23")], na.rm = TRUE)
+
+# Compute pre- and post-video means for BI
+data_test_clean$BI_pre_mean  <- rowMeans(data_test_clean[, c("bi11", "bi12", "bi13", "bi14")], na.rm = TRUE)
+data_test_clean$BI_post_mean <- rowMeans(data_test_clean[, c("bi21", "bi22", "bi23", "bi24")], na.rm = TRUE)
+
+# One-sided paired t-test: PU post > PU pre
+t_test_PU <- t.test(
+  data_test_clean$PU_post_mean,
+  data_test_clean$PU_pre_mean,
+  paired = TRUE,
+  alternative = "greater"
+)
+
+# One-sided paired t-test: BI post > BI pre
+t_test_BI <- t.test(
+  data_test_clean$BI_post_mean,
+  data_test_clean$BI_pre_mean,
+  paired = TRUE,
+  alternative = "greater"
+)
+
+t_test_PU
+t_test_BI
+
+# Interpretation for PU
+if (t_test_PU$p.value < 0.05) {
+  message("PU: Post-video mean is significantly greater than pre-video mean (p = ", 
+          signif(t_test_PU$p.value, 3), 
+          ", mean difference = ", round(t_test_PU$estimate, 3), ").")
+} else {
+  message("PU: No significant increase from pre- to post-video (p = ", 
+          signif(t_test_PU$p.value, 3), ").")
+}
+
+# Interpretation for BI
+if (t_test_BI$p.value < 0.05) {
+  message("BI: Post-video mean is significantly greater than pre-video mean (p = ", 
+          signif(t_test_BI$p.value, 3), 
+          ", mean difference = ", round(t_test_BI$estimate, 3), ").")
+} else {
+  message("BI: No significant increase from pre- to post-video (p = ", 
+          signif(t_test_BI$p.value, 3), ").")
+}
+```
+

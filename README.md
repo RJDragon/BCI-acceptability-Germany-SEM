@@ -24,11 +24,12 @@ The analysis is implemented in R and covers:
 6. **Hypothesis Testing:** Mediation analysis (bootstrapping), Welch t-tests (German vs. French sample), and paired-sample t-tests (Pre- vs. Post-video intervention).
 
 ## 📂 Repository Structure
-* `Thesis_BCI.Rmd`: The primary R Markdown file containing all code.
+* `GitHub_Thesis_BCI.Rmd`: The primary R Markdown file containing all code.
 
 
 ## 🛠️ Usage
 To reproduce the analysis:
 1. Clone this repository.
-2. Ensure you have the following R packages installed: `lavaan`, `psych`, `tidyverse`, and `semTools`.
-3. Open the R project and knit `Thesis_BCI.Rmd`.
+2. Ensure you have the following R packages installed:
+tidyverse, readxl, lavaan, semTools, semhelpinghands, stringr, knitr, kableExtra, gt, purrr, ggforce, BayesFactor, writexl, semPlot, ggplot2, dplyr, patchwork, gridExtra
+3. Open the R project and knit `GitHub_Thesis_BCI.Rmd`.

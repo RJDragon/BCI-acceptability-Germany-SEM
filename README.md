@@ -19,7 +19,7 @@ The analysis is implemented in R and covers:
 1. **Data Preprocessing:** Cleaning, reverse coding, and merging of age-group datasets.
 2. **Exclusion Criteria:** Implementation of attention-check and video-viewing filters.
 3. **Descriptive Statistics:** Demographic summaries and variable distributions.
-4. **Measurement Models:** Two CFAs to validate the 16-factor structure.
+4. **Measurement Models:** Two CFAs to examine the 16-factor structure.
 5. **Structural Model:** SEM estimation using factor scores for parsimony.
 6. **Hypothesis Testing:** Mediation analysis (bootstrapping), Welch t-tests (German vs. French sample), and paired-sample t-tests (Pre- vs. Post-video intervention).
 
